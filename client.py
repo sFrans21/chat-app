@@ -2,7 +2,7 @@ import socket
 
 ip = "localhost"
 
-port = 139
+port = 135
 
 sc = socket.socket()
 

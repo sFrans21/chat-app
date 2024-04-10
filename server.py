@@ -1,7 +1,7 @@
 import socket
 
 ip = socket.gethostname()
-port = 139
+port = 135
 
 sc = socket.socket()
 sc.bind(ip, port)
