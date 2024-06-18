@@ -1,65 +1,98 @@
-# import socket
-
-# ip = socket.gethostname()
-# port = 58638
-
-# sc = socket.socket()
-# sc.bind(ip, port)
-# print("Server Diaktifkan")
-
-# sc.listen(5)
-# conn,addr = sc.accept()
-# print("Terhubung dengan ", addr)
-
-# while 1:
-#       pesan = input(str(">>Anda: "))
-#       pesan = pesan.encode()
-#       conn.send(pesan)
-      
-#       inbox = conn.recv(1024)
-#       inbox = inbox.decode
-#       print("Client:", inbox)
-
-
-import socket
 import threading
-from tkinter import *
-from tkinter import scrolledtext
+import socket
+import argparse
+import os
 
-def start_server():
- server.listen()
- print("Server Menunggu Koneksi...")
- while True:
-      client, address = server.accept()
-      print(f"Terhubung dengan {str(address)}")
-      thread = threading.Thread(target=handle_client, args=(client,))
-      thread.start()
-def handle_client(client):
- while True:
-      try:
-            message = client.recv(1024).decode('utf-8')
-            chat_log.insert(END, "Client: " + message + "\n")
-      except:
-            client.close()
-            break
 
-def send_message():
- message = entry_message.get()
- chat_log.insert(END, "Server: " + message + "\n")
- client.send(message.encode('utf-8'))
- entry_message.delete(0, END)
- 
- 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind(('192.168.1.9', 58638))
-window = Tk()
-window.title("Server")
-chat_log = scrolledtext.ScrolledText(window, width=50, height=10)
-chat_log.grid(column=0, row=0, padx=10, pady=10)
-entry_message = Entry(window, width=40)
-entry_message.grid(column=0, row=1, padx=10, pady=10)
-send_button = Button(window, text="Kirim", command=send_message)
-send_button.grid(column=0, row=2, padx=10, pady=10)
-server_thread = threading.Thread(target=start_server)
-server_thread.start()
-window.mainloop()
+class Server(threading.Thread):
+  
+  def __init__(self, host, port):
+    super().__init__()
+    self.connections = []
+    self.host = host
+    self.port = port
+    
+    
+  def run(self):
+    
+    sock  = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((self.host, self.port))
+    
+    sock.listen(1)
+    
+    print("Listening at", sock.getsockname())
+    
+    while True:
+      sc, sockname = sock.accept()
+      
+      print(f"Koneksi diterima dari {sc.getpeername()} ke {sc.getsockname()}")
+      
+      server_socket = ServerSocket(sc, sockname, self)
+      
+      server_socket.start()
+      
+      self.connections.append(server_socket)
+      print("Siap untuk menerim pesan dari ", sc.getpeername() )
+    
+  def broadcast(self, message, source):
+    for connection in self.connections:
+      if connection.sockname != source:
+        connection.send(message)
+      
+  def remove_connection(self, connection):
+    self.connections.remove(connection)
+
+
+class ServerSocket(threading.Thread):
+  
+  def __init__(self, sc, sockname, server):
+    super().__init__()
+    self.sc = sc
+    self.sockname = sockname
+    self.server = server
+    
+  def run(self):
+    
+    while True:
+      message = self.sc.recv(1024).decode('ascii')
+      
+      if message:
+        print(f'{self.sockname} say {message}')
+        self.server.broadcast(message, self.sockname)
+        
+      else:
+        print(f'{self.sockname} sudah menutup koneksi')
+        self.sc.close()
+        server.remove_connection(self)
+        return
+  
+  def send(self, message):
+    
+    self.sc.sendall(message.encode('ascii'))
+    
+  def exit(server):
+    
+    while True:
+      ipt = input("")
+      if ipt == "q":
+        print("Menutup semua koneksi....")
+        for connection in server.connections:
+          connection.sc.close()
+        
+        print("Menutup server....")
+        os._exit(0)
+        
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="Chatroom Server")
+  parser.add_argument('host', help='Interfce the server listens at')
+  parser.add_argument('-p', metavar='PORT', type=int, default=1060, help='TCP port (default 1060)')
+    
+  args = parser.parse_args()
+  
+  server = Server(args.host, args.p)
+  server.start()
+  
+  exit = threading.Thread(target=exit, args=(server,))    
+  exit.start()
+     
